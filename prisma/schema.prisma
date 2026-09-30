@@ -1,0 +1,254 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  CUSTOMER
+  ADMIN
+}
+
+enum ProductType {
+  PHYSICAL
+  DIGITAL
+}
+
+enum ProductStatus {
+  ACTIVE
+  DRAFT
+  DISABLED
+}
+
+enum OrderStatus {
+  RECEIVED
+  PREPARING
+  SHIPPED
+  DELIVERED
+  CANCELED
+}
+
+enum PaymentStatus {
+  PENDING
+  PROCESSING
+  PAID
+  REJECTED
+  REFUNDED
+  CANCELED
+}
+
+model User {
+  id            String    @id @default(cuid())
+  name          String
+  email         String    @unique
+  passwordHash  String
+  whatsapp      String?
+  cpf           String?
+  role          Role      @default(CUSTOMER)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  addresses     Address[]
+  orders        Order[]
+  cart          Cart?
+}
+
+model Category {
+  id          String    @id @default(cuid())
+  name        String
+  slug        String    @unique
+  active      Boolean   @default(true)
+  createdAt   DateTime  @default(now())
+
+  products    Product[]
+}
+
+model Product {
+  id                String          @id @default(cuid())
+  name              String
+  slug              String          @unique
+  description       String
+  price             Decimal         @db.Decimal(10, 2)
+  promoPrice        Decimal?        @db.Decimal(10, 2)
+  sku               String          @unique
+  stock             Int             @default(0)
+  weightGrams        Int?
+  widthCm           Int?
+  heightCm          Int?
+  lengthCm          Int?
+  type              ProductType     @default(PHYSICAL)
+  status            ProductStatus   @default(DRAFT)
+  categoryId        String
+  category          Category        @relation(fields: [categoryId], references: [id])
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
+
+  images            ProductImage[]
+  variants          ProductVariant[]
+  cartItems         CartItem[]
+  orderItems        OrderItem[]
+}
+
+model ProductImage {
+  id         String   @id @default(cuid())
+  productId  String
+  product    Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  url        String
+  isPrimary  Boolean  @default(false)
+  order      Int      @default(0)
+}
+
+model ProductVariant {
+  id         String   @id @default(cuid())
+  productId  String
+  product    Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  size       String?
+  color      String?
+  stock      Int      @default(0)
+  skuSuffix  String?
+
+  cartItems   CartItem[]
+  orderItems  OrderItem[]
+
+  @@unique([productId, size, color])
+}
+
+model Cart {
+  id         String     @id @default(cuid())
+  userId     String     @unique
+  user       User       @relation(fields: [userId], references: [id])
+  items      CartItem[]
+  updatedAt  DateTime   @updatedAt
+}
+
+model CartItem {
+  id         String          @id @default(cuid())
+  cartId     String
+  cart       Cart            @relation(fields: [cartId], references: [id], onDelete: Cascade)
+  productId  String
+  product    Product         @relation(fields: [productId], references: [id])
+  variantId  String?
+  variant    ProductVariant? @relation(fields: [variantId], references: [id])
+  quantity   Int             @default(1)
+}
+
+model Address {
+  id            String   @id @default(cuid())
+  userId        String
+  user          User     @relation(fields: [userId], references: [id])
+  label         String   // "Casa", "Trabalho"
+  fullName      String
+  cpf           String?
+  whatsapp      String
+  email         String
+  zipCode       String
+  state         String
+  city          String
+  neighborhood  String
+  street        String
+  number        String
+  complement    String?
+  reference     String?
+  isDefault     Boolean  @default(false)
+
+  orders        Order[]
+}
+
+model Order {
+  id                String        @id @default(cuid())
+  number            String        @unique // TH-000152
+  userId            String
+  user              User          @relation(fields: [userId], references: [id])
+  addressId         String?
+  address           Address?      @relation(fields: [addressId], references: [id])
+
+  subtotal          Decimal       @db.Decimal(10, 2)
+  shippingCost       Decimal       @db.Decimal(10, 2) @default(0)
+  discount          Decimal       @db.Decimal(10, 2) @default(0)
+  total             Decimal       @db.Decimal(10, 2)
+
+  paymentStatus     PaymentStatus @default(PENDING)
+  status            OrderStatus   @default(RECEIVED)
+
+  trackingCode      String?
+  mpPreferenceId    String?
+  mpPaymentId       String?
+
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
+
+  items             OrderItem[]
+  payments          Payment[]
+}
+
+model OrderItem {
+  id           String          @id @default(cuid())
+  orderId      String
+  order        Order           @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  productId    String
+  product      Product         @relation(fields: [productId], references: [id])
+  variantId    String?
+  variant      ProductVariant? @relation(fields: [variantId], references: [id])
+  productName  String          // snapshot
+  variantLabel String?         // snapshot, ex "M / Preto"
+  unitPrice    Decimal         @db.Decimal(10, 2) // snapshot do preço no momento da compra
+  quantity     Int
+}
+
+model Payment {
+  id             String        @id @default(cuid())
+  orderId        String
+  order          Order         @relation(fields: [orderId], references: [id])
+  provider       String        @default("mercadopago")
+  mpPaymentId    String?
+  status         PaymentStatus
+  rawStatus      String?
+  amount         Decimal       @db.Decimal(10, 2)
+  createdAt      DateTime      @default(now())
+
+  events         PaymentEvent[]
+}
+
+model PaymentEvent {
+  id          String   @id @default(cuid())
+  paymentId   String
+  payment     Payment  @relation(fields: [paymentId], references: [id])
+  eventType   String
+  payload     Json
+  receivedAt  DateTime @default(now())
+}
+
+model StoreSettings {
+  id              String  @id @default(cuid())
+  storeName       String  @default("TH IMPORTS")
+  logoUrl         String?
+  bannerUrl       String?
+  primaryColor    String  @default("#7C3AED")
+  contactEmail    String?
+  whatsapp        String?
+  address         String?
+  faq             Json?
+  policies        String?
+  shippingInfo    Json?
+}
+
+model PasswordResetToken {
+  id         String   @id @default(cuid())
+  userId     String
+  token      String   @unique
+  expiresAt  DateTime
+  used       Boolean  @default(false)
+  createdAt  DateTime @default(now())
+}
+
+model Coupon {
+  id           String   @id @default(cuid())
+  code         String   @unique
+  percentOff   Int?
+  amountOff    Decimal? @db.Decimal(10, 2)
+  active       Boolean  @default(true)
+  expiresAt    DateTime?
+}
