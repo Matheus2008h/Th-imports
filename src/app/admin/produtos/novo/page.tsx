@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import NovoProdutoForm from "./NovoProdutoForm";
 
+export const dynamic = "force-dynamic";
 export default async function NovoProdutoPage() {
   const categories = await prisma.category.findMany({ orderBy: { name: "asc" } });
   return (
