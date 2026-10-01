@@ -18,7 +18,7 @@ function getClient() {
 export async function createPreference(order: {
   id: string;
   number: string;
-  items: { title: string; quantity: number; unitPrice: number }[];
+  items: { id: string; title: string; quantity: number; unitPrice: number }[];
   shippingCost: number;
   payerEmail: string;
 }) {
@@ -28,6 +28,7 @@ export async function createPreference(order: {
   const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
 
   const items = order.items.map((item) => ({
+    id: item.id,
     title: item.title,
     quantity: item.quantity,
     unit_price: item.unitPrice,
@@ -36,6 +37,7 @@ export async function createPreference(order: {
 
   if (order.shippingCost > 0) {
     items.push({
+      id: "shipping",
       title: "Frete",
       quantity: 1,
       unit_price: order.shippingCost,
