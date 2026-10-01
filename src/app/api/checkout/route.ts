@@ -89,7 +89,7 @@ export async function POST(req: NextRequest) {
   const preference = await createPreference({
     id: order.id,
     number: order.number,
-    items: order.items.map((i) => ({ title: i.productName, quantity: i.quantity, unitPrice: Number(i.unitPrice) })),
+    items: order.items.map((i) => ({ id: i.id, title: i.productName, quantity: i.quantity, unitPrice: Number(i.unitPrice) })),
     shippingCost,
     payerEmail: order.user.email,
   });
